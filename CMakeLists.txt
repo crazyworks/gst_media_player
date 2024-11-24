@@ -40,6 +40,7 @@ set(SRC_FILES
     src/elements/audio_demux.c
     src/elements/audio_demux2.c
     src/elements/media_demux.c
+    src/elements/my_parser.c
     src/elements/my_adec.c
     src/elements/my_audiorender.c
     src/elements/my_demux.c

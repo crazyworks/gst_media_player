@@ -1,58 +1,74 @@
 #include <gst/gst.h>
 #include "my_demux.h"
 #include "video_player.h"
+#include "my_parser.h"
 // Plugin initialization function declaration (must be consistent with the definition in my_demux.c)
 extern gboolean plugin_init(GstPlugin *plugin);
 
-void on_pad_added(GstElement *element, GstPad *pad, gpointer data);
+static void on_demuxer_pad_added(GstElement *element, GstPad *pad, gpointer data);
+static void on_parser_pad_added(GstElement *element, GstPad *pad, gpointer data);
 
-#define FILE_PATH "/Users/lizhen/Downloads/test.mp4"
 // Define your own main function
 int video_player(const char *file_path) {
-    GstElement *pipeline, *demuxer, *h264parse, *decoder, *video_sink;
+    GstElement *pipeline, *demuxer, *queue, *myparser, *decoder, *video_sink;
     GstBus *bus;
     GstMessage *msg;
 
     gst_init(NULL, NULL);
-    plugin_init(NULL);
+    
+    if (!plugin_init(NULL)) {
+        g_printerr("video_player: Failed to initialize demux plugin.\n");
+        return -1;
+    }
 
-    g_print("Entering my_main function.\n");
+    if (!my_parser_plugin_init(NULL)) {
+        g_printerr("video_player: Failed to initialize parser plugin.\n");
+        return -1;
+    }
+
+    g_print("video_player: Entering my_main function.\n");
 
     // Create GStreamer elements
     pipeline = gst_pipeline_new("mp4-player");
     demuxer = gst_element_factory_make("mydemux", "demuxer");
-    h264parse = gst_element_factory_make("h264parse", "h264parse");
+    queue = gst_element_factory_make("queue", "queue");
+    myparser = gst_element_factory_make("myparser", "myparser");
     decoder = gst_element_factory_make("avdec_h264", "decoder");
     video_sink = gst_element_factory_make("glimagesink", "video_sink");
 
-    if (!pipeline || !demuxer || !h264parse || !decoder || !video_sink) {
-        g_printerr("Failed to create one or more GStreamer elements.\n");
+    if (!pipeline || !demuxer || !queue || !myparser || !decoder || !video_sink) {
+        g_printerr("video_player: Failed to create one or more GStreamer elements.\n");
         return -1;
     }
 
     // Set input file path for the demuxer
-    g_object_set(G_OBJECT(demuxer), "location", FILE_PATH, NULL);
+    g_object_set(G_OBJECT(demuxer), "location", file_path, NULL);
 
     // Add elements to the pipeline
-    gst_bin_add_many(GST_BIN(pipeline), demuxer, h264parse, decoder, video_sink, NULL);
+    gst_bin_add_many(GST_BIN(pipeline), demuxer, queue, myparser, decoder, video_sink, NULL);
 
-    // Link h264parse to decoder and video sink
-    if (!gst_element_link_many(h264parse, decoder, video_sink, NULL)) {
-        g_printerr("Failed to link h264parse, decoder, and video sink.\n");
-        gst_object_unref(pipeline);
+    // Handle demuxer's dynamic pad
+    g_signal_connect(demuxer, "pad-added", G_CALLBACK(on_demuxer_pad_added), queue);
+
+    // Link queue to myparser
+    if (!gst_element_link(queue, myparser)) {
+        g_printerr("video_player: Failed to link queue to myparser.\n");
         return -1;
     }
 
-    g_print("Link h264parse, decoder, and video sink.\n");
-    // Handle demuxer's dynamic pad
-    g_signal_connect(demuxer, "pad-added", G_CALLBACK(on_pad_added), h264parse);
+    // Handle myparser's dynamic pad
+    g_signal_connect(myparser, "pad-added", G_CALLBACK(on_parser_pad_added), decoder);
 
-    g_print("Connect demuxer's pad-added signal to on_pad_added function.\n");
+    // Static link decoder to video sink
+    if (!gst_element_link(decoder, video_sink)) {
+        g_printerr("video_player: Failed to link decoder to video sink.\n");
+        return -1;
+    }
 
     // Start playback
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
-    g_print("start playing.\n");
+    g_print("video_player: start playing.\n");
 
     // Get the message bus
     bus = gst_element_get_bus(pipeline);
@@ -66,15 +82,15 @@ int video_player(const char *file_path) {
         switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_ERROR:
             gst_message_parse_error(msg, &err, &debug_info);
-            g_printerr("Error: %s\n", err->message);
+            g_printerr("video_player: Error: %s\n", err->message);
             g_error_free(err);
             g_free(debug_info);
             break;
         case GST_MESSAGE_EOS:
-            g_print("Playback finished\n");
+            g_print("video_player: Playback finished\n");
             break;
         default:
-            g_printerr("Unknown message type\n");
+            g_printerr("video_player: Unknown message type\n");
             break;
         }
         gst_message_unref(msg);
@@ -87,53 +103,28 @@ int video_player(const char *file_path) {
 
     return 0;
 }
+static void on_demuxer_pad_added(GstElement *element, GstPad *pad, gpointer data) {
+    GstElement *queue = GST_ELEMENT(data);
+    GstPad *queue_sink_pad = gst_element_get_static_pad(queue, "sink");
 
-// The on_pad_added function
-void on_pad_added(GstElement *element, GstPad *pad, gpointer data) {
-    g_print("on_pad_added function is called for pad: %s\n", GST_PAD_NAME(pad));
-
-    GstElement *h264parse = (GstElement *)data;
-    GstPad *sink_pad = gst_element_get_static_pad(h264parse, "sink");
-
-    if (gst_pad_is_linked(sink_pad)) {
-        g_print("Sink pad is already linked. Ignoring.\n");
-        g_object_unref(sink_pad);
-        return;
-    }
-
-    GstCaps *new_pad_caps = gst_pad_get_current_caps(pad);
-    if (!new_pad_caps) {
-        g_printerr("Failed to get caps for pad: %s\n", GST_PAD_NAME(pad));
-        g_object_unref(sink_pad);
-        return;
-    }
-
-    GstStructure *new_pad_struct = gst_caps_get_structure(new_pad_caps, 0);
-    if (!new_pad_struct) {
-        g_printerr("Failed to get structure for pad: %s\n", GST_PAD_NAME(pad));
-        gst_caps_unref(new_pad_caps);
-        g_object_unref(sink_pad);
-        return;
-    }
-
-    const gchar *new_pad_type = gst_structure_get_name(new_pad_struct);
-    if (!new_pad_type || !g_str_has_prefix(new_pad_type, "video/x-h264")) {
-        g_print("Pad type %s is not video/x-h264. Ignoring.\n", new_pad_type ? new_pad_type : "(null)");
-        gst_caps_unref(new_pad_caps);
-        g_object_unref(sink_pad);
-        return;
-    }
-
-    g_print("Caps for pad %s: %s\n", GST_PAD_NAME(pad), gst_caps_to_string(new_pad_caps));
-
-    g_print("Linking video pad: %s to sink pad.\n", GST_PAD_NAME(pad));
-    if (gst_pad_link(pad, sink_pad) != GST_PAD_LINK_OK) {
-        g_printerr("Failed to link video pad: %s to sink pad.\n", GST_PAD_NAME(pad));
+    if (gst_pad_link(pad, queue_sink_pad) != GST_PAD_LINK_OK) {
+        g_warning("Failed to link demuxer pad to queue sink pad");
     } else {
-        g_print("Successfully linked video pad: %s to sink pad.\n", GST_PAD_NAME(pad));
+        g_print("Successfully linked demuxer pad to queue sink pad\n");
     }
 
-    gst_caps_unref(new_pad_caps);
-    g_object_unref(sink_pad);
+    g_object_unref(queue_sink_pad);
 }
 
+static void on_parser_pad_added(GstElement *element, GstPad *pad, gpointer data) {
+    GstElement *decoder = GST_ELEMENT(data);
+    GstPad *decoder_sink_pad = gst_element_get_static_pad(decoder, "sink");
+
+    if (gst_pad_link(pad, decoder_sink_pad) != GST_PAD_LINK_OK) {
+        g_warning("Failed to link myparser src pad to decoder sink pad");
+    } else {
+        g_print("Successfully linked myparser src pad to decoder sink pad\n");
+    }
+
+    g_object_unref(decoder_sink_pad);
+}

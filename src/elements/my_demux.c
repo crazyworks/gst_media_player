@@ -140,7 +140,9 @@ static gboolean my_demux_start(MyDemux *demux) {
             demux->video_stream_idx = i;
 
             demux->video_src_pad = gst_pad_new_from_static_template(&video_src_template, "video_src_%u");
-            gst_element_add_pad(GST_ELEMENT(demux), demux->video_src_pad);
+
+            // 激活 src pad
+            gst_pad_set_active(demux->video_src_pad, TRUE);
 
             // 设置 caps 和 codec_data
             GstCaps *video_caps = NULL;
@@ -166,13 +168,14 @@ static gboolean my_demux_start(MyDemux *demux) {
                                                  NULL);
             }
 
+            // 发送 stream-start 事件
+            GstEvent *stream_start_event = gst_event_new_stream_start(stream_id);
+            gst_event_set_group_id(stream_start_event, gst_util_group_id_next());
+            gst_pad_push_event(demux->video_src_pad, stream_start_event);
+
             // 设置 caps
             gst_pad_set_caps(demux->video_src_pad, video_caps);
             gst_caps_unref(video_caps);
-
-            // 发送 stream-start 事件
-            GstEvent *stream_start_event = gst_event_new_stream_start(stream_id);
-            gst_pad_push_event(demux->video_src_pad, stream_start_event);
 
             // 发送 segment 事件
             GstSegment segment;
@@ -182,10 +185,9 @@ static gboolean my_demux_start(MyDemux *demux) {
             GstEvent *segment_event = gst_event_new_segment(&segment);
             gst_pad_push_event(demux->video_src_pad, segment_event);
 
-            // 发送 pad-added 信号
-            g_signal_emit_by_name(GST_ELEMENT(demux), "pad-added", demux->video_src_pad);
-
             g_free(stream_id);  // 释放 stream_id
+
+            gst_element_add_pad(GST_ELEMENT(demux), demux->video_src_pad);
 
             break; // 找到一个视频流即可，跳出循环
         }
@@ -250,7 +252,13 @@ static GstFlowReturn my_demux_push_data(MyDemux *demux) {
                 GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(pkt.duration, GST_SECOND * stream->time_base.num, stream->time_base.den);
             }
 
+            g_print("PTS: %" GST_TIME_FORMAT ", DTS: %" GST_TIME_FORMAT "\n", 
+                    GST_TIME_ARGS(GST_BUFFER_PTS(buffer)), GST_TIME_ARGS(GST_BUFFER_DTS(buffer)));
+
             GstFlowReturn ret = gst_pad_push(demux->video_src_pad, buffer);
+            if (ret != GST_FLOW_OK) {
+                g_printerr("Failed to push buffer to pad, flow return: %d\n", ret);
+            }
             av_packet_unref(&pkt);
             return ret;
         }
