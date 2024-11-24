@@ -6,6 +6,7 @@
 #include <libavcodec/avcodec.h>
 #include <pthread.h>
 #include <string.h>
+#include <gst/gstutils.h>
 
 /* Define private structure */
 typedef struct _MediaDemuxPrivate {
