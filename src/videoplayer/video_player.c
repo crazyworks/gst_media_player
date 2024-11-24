@@ -41,6 +41,9 @@ int video_player(const char *file_path) {
         return -1;
     }
 
+    // Set the size of the queue to 20 frames
+    g_object_set(G_OBJECT(queue), "max-size-buffers", 20, NULL);
+
     // Set input file path for the demuxer
     g_object_set(G_OBJECT(demuxer), "location", file_path, NULL);
 

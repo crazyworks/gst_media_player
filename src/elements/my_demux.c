@@ -241,15 +241,23 @@ static GstFlowReturn my_demux_push_data(MyDemux *demux) {
             GstBuffer *buffer = gst_buffer_new_allocate(NULL, pkt.size, NULL);
             gst_buffer_fill(buffer, 0, pkt.data, pkt.size);
 
-            // 设置 buffer 的 PTS、DTS 和时长
+            // 使用 av_rescale_q 将时间戳转换为 GstClockTime
             if (pkt.pts != AV_NOPTS_VALUE) {
-                GST_BUFFER_PTS(buffer) = gst_util_uint64_scale(pkt.pts, GST_SECOND * stream->time_base.num, stream->time_base.den);
+                GST_BUFFER_PTS(buffer) = av_rescale_q(pkt.pts, stream->time_base, (AVRational){1, GST_SECOND});
+            } else {
+                GST_BUFFER_PTS(buffer) = GST_CLOCK_TIME_NONE;
             }
+
             if (pkt.dts != AV_NOPTS_VALUE) {
-                GST_BUFFER_DTS(buffer) = gst_util_uint64_scale(pkt.dts, GST_SECOND * stream->time_base.num, stream->time_base.den);
+                GST_BUFFER_DTS(buffer) = av_rescale_q(pkt.dts, stream->time_base, (AVRational){1, GST_SECOND});
+            } else {
+                GST_BUFFER_DTS(buffer) = GST_CLOCK_TIME_NONE;
             }
+
             if (pkt.duration > 0) {
-                GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(pkt.duration, GST_SECOND * stream->time_base.num, stream->time_base.den);
+                GST_BUFFER_DURATION(buffer) = av_rescale_q(pkt.duration, stream->time_base, (AVRational){1, GST_SECOND});
+            } else {
+                GST_BUFFER_DURATION(buffer) = GST_CLOCK_TIME_NONE;
             }
 
             g_print("PTS: %" GST_TIME_FORMAT ", DTS: %" GST_TIME_FORMAT "\n", 
@@ -281,7 +289,7 @@ static void my_demux_loop(MyDemux *demux) {
             break;
         }
         // 控制读取速度
-        g_usleep(10000);
+        g_usleep(1000);
     }
 }
 
