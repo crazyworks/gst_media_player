@@ -45,6 +45,7 @@ set(SRC_FILES
     src/elements/my_audiorender.c
     src/elements/my_demux.c
     src/elements/media_h264parse.c
+    src/elements/media_h265parse.c
     src/elements/media_vdec.c
     src/elements/media_videorender.c
     src/elements/media_demux.c
