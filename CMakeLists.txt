@@ -40,13 +40,14 @@ set(SRC_FILES
     src/elements/audio_demux.c
     src/elements/audio_demux2.c
     src/elements/media_demux.c
-    src/elements/my_parser.c
+    src/elements/media_parser.c
     src/elements/my_adec.c
     src/elements/my_audiorender.c
     src/elements/my_demux.c
-    src/elements/my_h264parse.c
-    src/elements/my_vdec.c
-    src/elements/my_videorender.c
+    src/elements/media_h264parse.c
+    src/elements/media_vdec.c
+    src/elements/media_videorender.c
+    src/elements/media_demux.c
     src/mediaplayer/media_player.c
     src/videoplayer/video_player.c
 )

@@ -1,22 +1,29 @@
 #define PACKAGE "my_plugin"
 #include <gst/gst.h>
 #include <libavcodec/bsf.h>
-#include "my_h264parse.h"
+#include "media_h264parse.h"
 
 // Private data structure
-typedef struct _MyH264ParsePrivate {
+typedef struct _MediaH264ParsePrivate {
     AVBSFContext *bsf_ctx;  // FFmpeg Bitstream Filter context
     GstPad *sinkpad;
     GstPad *srcpad;
-} MyH264ParsePrivate;
+} MediaH264ParsePrivate;
+
+struct _MediaH264Parse {
+    GstElement parent;
+};
 
 // Define type and associate private data
-G_DEFINE_TYPE_WITH_PRIVATE(MyH264Parse, my_h264parse, GST_TYPE_ELEMENT)
+G_DEFINE_TYPE_WITH_PRIVATE(MediaH264Parse, media_h264parse, GST_TYPE_ELEMENT)
+
+// Macro to cast parent to MediaH264Parse
+#define MEDIA_H264PARSE(obj) ((MediaH264Parse *)(obj))
 
 // Chain function to handle incoming data on the sink pad
-static GstFlowReturn my_h264parse_chain(GstPad *pad, GstObject *parent, GstBuffer *buf) {
-    MyH264Parse *parse = MY_H264PARSE(parent);
-    MyH264ParsePrivate *priv = my_h264parse_get_instance_private(parse);
+static GstFlowReturn media_h264parse_chain(GstPad *pad, GstObject *parent, GstBuffer *buf) {
+    MediaH264Parse *parse = MEDIA_H264PARSE(parent);
+    MediaH264ParsePrivate *priv = media_h264parse_get_instance_private(parse);
     GstFlowReturn ret = GST_FLOW_OK;
     GstBuffer *outbuf = NULL;
 
@@ -58,21 +65,21 @@ static GstFlowReturn my_h264parse_chain(GstPad *pad, GstObject *parent, GstBuffe
 }
 
 // Finalize function
-static void my_h264parse_finalize(GObject *object) {
-    MyH264Parse *parse = MY_H264PARSE(object);
-    MyH264ParsePrivate *priv = my_h264parse_get_instance_private(parse);
+static void media_h264parse_finalize(GObject *object) {
+    MediaH264Parse *parse = MEDIA_H264PARSE(object);
+    MediaH264ParsePrivate *priv = media_h264parse_get_instance_private(parse);
 
     if (priv->bsf_ctx) {
         av_bsf_free(&priv->bsf_ctx);
     }
 
-    G_OBJECT_CLASS(my_h264parse_parent_class)->finalize(object);
+    G_OBJECT_CLASS(media_h264parse_parent_class)->finalize(object);
 }
 
 // State change function
-static GstStateChangeReturn my_h264parse_change_state(GstElement *element, GstStateChange transition) {
-    MyH264Parse *parse = MY_H264PARSE(element);
-    MyH264ParsePrivate *priv = my_h264parse_get_instance_private(parse);
+static GstStateChangeReturn media_h264parse_change_state(GstElement *element, GstStateChange transition) {
+    MediaH264Parse *parse = MEDIA_H264PARSE(element);
+    MediaH264ParsePrivate *priv = media_h264parse_get_instance_private(parse);
     GstStateChangeReturn ret;
 
     switch (transition) {
@@ -108,24 +115,24 @@ static GstStateChangeReturn my_h264parse_change_state(GstElement *element, GstSt
             break;
     }
 
-    ret = GST_ELEMENT_CLASS(my_h264parse_parent_class)->change_state(element, transition);
+    ret = GST_ELEMENT_CLASS(media_h264parse_parent_class)->change_state(element, transition);
     return ret;
 }
 
 // Class initialization function
-static void my_h264parse_class_init(MyH264ParseClass *klass) {
+static void media_h264parse_class_init(MediaH264ParseClass *klass) {
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
     GstElementClass *element_class = GST_ELEMENT_CLASS(klass);
 
     // Set finalize function
-    gobject_class->finalize = my_h264parse_finalize;
+    gobject_class->finalize = media_h264parse_finalize;
 
     // Set state change function
-    element_class->change_state = my_h264parse_change_state;
+    element_class->change_state = media_h264parse_change_state;
 
     // Set element metadata
     gst_element_class_set_static_metadata(element_class,
-        "My H264 Parser",
+        "H264 Parser",
         "Filter/Parser",
         "Converts H264 AVCC format to Annex-B format using FFmpeg's BSF",
         "Your Name <youremail@example.com>");
@@ -148,12 +155,12 @@ static void my_h264parse_class_init(MyH264ParseClass *klass) {
 }
 
 // Instance initialization function
-static void my_h264parse_init(MyH264Parse *parse) {
-    MyH264ParsePrivate *priv = my_h264parse_get_instance_private(parse);
+static void media_h264parse_init(MediaH264Parse *parse) {
+    MediaH264ParsePrivate *priv = media_h264parse_get_instance_private(parse);
 
     GstPadTemplate *sink_templ = gst_element_class_get_pad_template(GST_ELEMENT_GET_CLASS(parse), "sink");
     priv->sinkpad = gst_pad_new_from_template(sink_templ, "sink");
-    gst_pad_set_chain_function(priv->sinkpad, GST_DEBUG_FUNCPTR(my_h264parse_chain));
+    gst_pad_set_chain_function(priv->sinkpad, GST_DEBUG_FUNCPTR(media_h264parse_chain));
     gst_element_add_pad(GST_ELEMENT(parse), priv->sinkpad);
 
     GstPadTemplate *src_templ = gst_element_class_get_pad_template(GST_ELEMENT_GET_CLASS(parse), "src");
@@ -162,17 +169,17 @@ static void my_h264parse_init(MyH264Parse *parse) {
 }
 
 // Plugin initialization function
-static gboolean plugin_init(GstPlugin *plugin) {
-    return gst_element_register(plugin, "my_h264parse", GST_RANK_NONE, MY_TYPE_H264PARSE);
+static gboolean media_h264parse_plugin_init(GstPlugin *plugin) {
+    return gst_element_register(plugin, "media_h264parse", GST_RANK_NONE, TYPE_MEDIA_H264PARSE);
 }
 
 // Define plugin
 GST_PLUGIN_DEFINE(
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    my_h264parse_plugin,
+    media_h264parse,
     "Converts H264 AVCC format to Annex-B format using FFmpeg's BSF",
-    plugin_init,
+    media_h264parse_plugin_init,
     "1.0",
     "LGPL",
     "GStreamer",

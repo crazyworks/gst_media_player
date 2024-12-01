@@ -12,7 +12,7 @@ static GstFlowReturn my_demux_push_data(MyDemux *demux);
 // 定义视频的动态 Pad 模板 (音频流被忽略)
 static GstStaticPadTemplate video_src_template = GST_STATIC_PAD_TEMPLATE(
     "video_src_%u", GST_PAD_SRC, GST_PAD_SOMETIMES,
-    GST_STATIC_CAPS("video/x-h264"));
+    GST_STATIC_CAPS_ANY);
 
 enum {
     PROP_0,
@@ -265,7 +265,7 @@ static GstFlowReturn my_demux_push_data(MyDemux *demux) {
 
             GstFlowReturn ret = gst_pad_push(demux->video_src_pad, buffer);
             if (ret != GST_FLOW_OK) {
-                g_printerr("Failed to push buffer to pad, flow return: %d\n", ret);
+                g_printerr("my_demux_push_data Failed to push buffer to pad, flow return: %d\n", ret);
             }
             av_packet_unref(&pkt);
             return ret;

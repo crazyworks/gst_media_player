@@ -1,12 +1,12 @@
 #define PACKAGE "my_plugin"
-#include "my_videorender.h"
+#include "media_videorender.h"
 #include <gst/video/video.h>
 #include <SDL2/SDL.h>
 #include <pthread.h>
 #include <stdbool.h>
 
 // Define private structure
-typedef struct _MyVideoRenderPrivate {
+typedef struct _MediaVideoRenderPrivate {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture; // Texture for rendering video frames
@@ -14,18 +14,18 @@ typedef struct _MyVideoRenderPrivate {
     pthread_mutex_t frame_mutex; // Mutex for frame access
     GstBuffer *current_frame; // Current video frame
     bool stop_rendering; // Flag to stop rendering thread
-} MyVideoRenderPrivate;
+} MediaVideoRenderPrivate;
 
-struct _MyVideoRender {
+struct _MediaVideoRender {
     GstElement parent;
 };
 
-G_DEFINE_TYPE_WITH_PRIVATE(MyVideoRender, my_videorender, GST_TYPE_ELEMENT)
+G_DEFINE_TYPE_WITH_PRIVATE(MediaVideoRender, media_videorender, GST_TYPE_ELEMENT)
 
 // Render thread function
 static void* render_loop(void *data) {
-    MyVideoRender *render = MY_VIDEORENDER(data);
-    MyVideoRenderPrivate *priv = my_videorender_get_instance_private(render);
+    MediaVideoRender *render = (MediaVideoRender *)data; // 修复类型转换错误
+    MediaVideoRenderPrivate *priv = media_videorender_get_instance_private(render);
 
     while (!priv->stop_rendering) {
         pthread_mutex_lock(&priv->frame_mutex);
@@ -60,12 +60,12 @@ static void* render_loop(void *data) {
 }
 
 // Class initialization function
-static void my_videorender_class_init(MyVideoRenderClass *klass) {
+static void media_videorender_class_init(MediaVideoRenderClass *klass) {
     GstElementClass *gstelement_class = GST_ELEMENT_CLASS(klass);
 
     // Set element metadata
     gst_element_class_set_static_metadata(gstelement_class,
-        "My Video Render",
+        "Video Render",
         "Render/Video",
         "Video rendering using SDL",
         "Your Name <youremail@example.com>"
@@ -89,8 +89,8 @@ static void my_videorender_class_init(MyVideoRenderClass *klass) {
 }
 
 // Instance initialization function
-static void my_videorender_init(MyVideoRender *render) {
-    MyVideoRenderPrivate *priv = my_videorender_get_instance_private(render);
+static void media_videorender_init(MediaVideoRender *render) {
+    MediaVideoRenderPrivate *priv = media_videorender_get_instance_private(render);
 
     // Initialize SDL and create window and renderer
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -148,16 +148,16 @@ static void my_videorender_init(MyVideoRender *render) {
 }
 
 // Plugin initialization function
-gboolean my_videorender_plugin_init(GstPlugin *plugin) {
-    return gst_element_register(plugin, "myvideorender", GST_RANK_NONE, MY_TYPE_VIDEORENDER);
+gboolean media_videorender_plugin_init(GstPlugin *plugin) {
+    return gst_element_register(plugin, "media_videorender", GST_RANK_NONE, TYPE_MEDIA_VIDEORENDER);
 }
 
 GST_PLUGIN_DEFINE(
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    myvideorender,
-    "My Video Render Plugin",
-    my_videorender_plugin_init,
+    media_videorender,
+    "Video Render Plugin",
+    media_videorender_plugin_init,
     "1.0",
     "LGPL",
     "GStreamer",

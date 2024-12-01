@@ -1,7 +1,7 @@
 #include <gst/gst.h>
 #include "my_demux.h"
 #include "video_player.h"
-#include "my_parser.h"
+#include "media_parser.h"
 // Plugin initialization function declaration (must be consistent with the definition in my_demux.c)
 extern gboolean plugin_init(GstPlugin *plugin);
 
@@ -21,7 +21,7 @@ int video_player(const char *file_path) {
         return -1;
     }
 
-    if (!my_parser_plugin_init(NULL)) {
+    if (!media_parser_plugin_init(NULL)) {
         g_printerr("video_player: Failed to initialize parser plugin.\n");
         return -1;
     }
@@ -32,7 +32,7 @@ int video_player(const char *file_path) {
     pipeline = gst_pipeline_new("mp4-player");
     demuxer = gst_element_factory_make("mydemux", "demuxer");
     queue = gst_element_factory_make("queue", "queue");
-    myparser = gst_element_factory_make("myparser", "myparser");
+    myparser = gst_element_factory_make("media_parser", "myparser");
     decoder = gst_element_factory_make("avdec_h264", "decoder");
     video_sink = gst_element_factory_make("glimagesink", "video_sink");
 
