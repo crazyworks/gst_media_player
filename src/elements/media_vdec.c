@@ -90,6 +90,8 @@ static gboolean push_decoded_buffer(MediaVdec *vdec, AVFrame *frame) {
             frame->linesize[1],
             frame->linesize[2]);
 
+    GST_BUFFER_PTS(buffer) = frame->pts;
+    GST_BUFFER_DTS(buffer) = frame->pkt_dts;
     // Copy video data from AVFrame to GstBuffer
     for (int i = 0; i < frame->height; i++) {
         memcpy(map.data + i * frame->width, frame->data[0] + i * frame->linesize[0], frame->width); // Y
@@ -165,15 +167,12 @@ static GstFlowReturn media_vdec_chain(GstPad *pad, GstObject *parent, GstBuffer 
 
     // Correctly rescale PTS and DTS to avcodec's time base
     if (pts != GST_CLOCK_TIME_NONE) {
-        packet->pts = av_rescale_q(pts, (AVRational){1, GST_SECOND}, priv->codec_ctx->time_base);
-    } else {
-        packet->pts = AV_NOPTS_VALUE;
+        packet->pts = pts;
     }
 
+
     if (dts != GST_CLOCK_TIME_NONE) {
-        packet->dts = av_rescale_q(dts, (AVRational){1, GST_SECOND}, priv->codec_ctx->time_base);
-    } else {
-        packet->dts = AV_NOPTS_VALUE;
+        packet->dts = dts;
     }
 
     g_print("media_vdec_chain: Packet PTS: %" PRId64 ", DTS: %" PRId64 "\n", packet->pts, packet->dts);

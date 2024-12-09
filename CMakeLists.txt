@@ -9,7 +9,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale libavfilter)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
+pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0 gstreamer-audio-1.0 gstreamer-video-1.0)
 
 message(STATUS "GStreamer libraries found at: ${GSTREAMER_LIBRARY_DIRS}")
 message(STATUS "GStreamer libraries: ${GSTREAMER_LIBRARIES}")
@@ -41,8 +41,8 @@ set(SRC_FILES
     src/elements/audio_demux2.c
     src/elements/media_demux.c
     src/elements/media_parser.c
-    src/elements/my_adec.c
-    src/elements/my_audiorender.c
+    src/elements/media_adec.c
+    src/elements/media_audiorender.c
     src/elements/my_demux.c
     src/elements/media_h264parse.c
     src/elements/media_h265parse.c
