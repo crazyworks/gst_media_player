@@ -56,6 +56,7 @@ static GstFlowReturn media_vdec_chain(GstPad *pad, GstObject *parent, GstBuffer 
 static GstStateChangeReturn media_vdec_change_state(GstElement *element, GstStateChange transition);
 static gboolean create_decoder(MediaVdecPrivate *priv, GstCaps *caps, AVRational time_base);
 static const gchar* map_pix_fmt_to_string(enum AVPixelFormat pix_fmt);
+static gboolean media_vdec_query_caps(GstPad *pad, GstObject *parent, GstQuery *query);
 // Convert AVFrame to GstBuffer and push downstream
 static gboolean push_decoded_buffer(MediaVdec *vdec, AVFrame *frame) {
     MediaVdecPrivate *priv = media_vdec_get_instance_private(vdec);
@@ -102,8 +103,6 @@ static gboolean push_decoded_buffer(MediaVdec *vdec, AVFrame *frame) {
     gst_buffer_unmap(buffer, &map);
 
     // Set buffer metadata (converted timestamps)
-    GST_BUFFER_PTS(buffer) = gst_util_uint64_scale(frame->best_effort_timestamp, GST_SECOND, AV_TIME_BASE); // Convert PTS
-    GST_BUFFER_DTS(buffer) = gst_util_uint64_scale(frame->pkt_dts, GST_SECOND, AV_TIME_BASE); // Convert DTS
 
     // Push the buffer downstream
     GstFlowReturn ret = gst_pad_push(priv->src_pad, buffer);
@@ -400,11 +399,13 @@ static void media_vdec_init(MediaVdec *vdec) {
     priv->sink_pad = gst_pad_new_from_static_template(&sink_template, "sink");
     gst_pad_set_chain_function(priv->sink_pad, GST_DEBUG_FUNCPTR(media_vdec_chain));
     gst_pad_set_event_function(priv->sink_pad, GST_DEBUG_FUNCPTR(media_vdec_sink_event));
+    gst_pad_set_query_function(priv->sink_pad, GST_DEBUG_FUNCPTR(media_vdec_query_caps));
     gst_element_add_pad(GST_ELEMENT(vdec), priv->sink_pad);
 
     // Create and add src pad
     priv->src_pad = gst_pad_new_from_static_template(&src_template, "src");
     gst_pad_set_event_function(priv->src_pad, GST_DEBUG_FUNCPTR(media_vdec_src_event));
+    // gst_pad_set_query_function(priv->src_pad, GST_DEBUG_FUNCPTR(media_vdec_query_caps));
     gst_element_add_pad(GST_ELEMENT(vdec), priv->src_pad);
 
     // Initialize mutex and condition variables
@@ -472,6 +473,37 @@ static GstStateChangeReturn media_vdec_change_state(GstElement *element, GstStat
     return ret;
 }
 
+// Query caps function
+static gboolean media_vdec_query_caps(GstPad *pad, GstObject *parent, GstQuery *query) {
+    MediaVdec *vdec = MEDIA_VDEC(parent);
+    MediaVdecPrivate *priv = media_vdec_get_instance_private(vdec);
+    gboolean ret = FALSE;
+
+    switch (GST_QUERY_TYPE(query)) {
+        case GST_QUERY_CAPS: {
+            GstCaps *filter;
+            gst_query_parse_caps(query, &filter);
+            g_print("media_vdec_query_caps: Querying caps for pad: %s, filter: %s\n", GST_PAD_NAME(pad), gst_caps_to_string(filter));
+
+            GstCaps *caps = gst_pad_get_pad_template_caps(pad);
+            if (filter) {
+                GstCaps *intersection = gst_caps_intersect(caps, filter);
+                gst_caps_unref(caps);
+                caps = intersection;
+            }
+            g_print("media_vdec_query_caps: Querying caps for pad: %s, caps: %s\n", GST_PAD_NAME(pad), gst_caps_to_string(caps));
+            gst_query_set_caps_result(query, caps);
+            gst_caps_unref(caps);
+            ret = TRUE;
+            break;
+        }
+        default:
+            ret = gst_pad_query_default(pad, parent, query);
+            break;
+    }
+
+    return ret;
+}
 
 // Map AVPixelFormat to string
 static const gchar* map_pix_fmt_to_string(enum AVPixelFormat pix_fmt) {
